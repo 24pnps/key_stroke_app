@@ -4,6 +4,7 @@ This project develop a log-in screen to perform user authentication by using bot
 
 ## To run this project
 
+`cd key_app`
 `flutter pub get`
 
 ## Getting Started
