@@ -8,6 +8,8 @@ This project develop a log-in screen to perform user authentication by using bot
 
 `flutter pub get`
 
+`flutterfire configure` to configure your firebase
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.
