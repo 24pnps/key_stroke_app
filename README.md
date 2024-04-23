@@ -2,20 +2,26 @@
 
 This project develop a log-in screen to perform user authentication by using both password and style of typing.
 
-## To run this project
+## Members
 
-`cd key_app`
-
-`flutter pub get`
-
-`flutterfire configure` to configure your firebase
-
-`flutter run`
+- 6488179 Ponnapassorn Iamborisut
+- 6488181 Thadeeya Duangkaew
+- 6488210 Ravikarn Jarungjitvittawas
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+### To run our project
 
+`$ cd key_app`
+
+`$ flutter pub get`
+
+`$ flutterfire configure` [Optional if you want to cofigure with you Firebase]
+
+`$ flutter run`
+
+### Additional Resource
+This project is a starting point for a Flutter application.
 A few resources to get you started if this is your first Flutter project:
 
 - [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
