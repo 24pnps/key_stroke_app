@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:async';
-import 'dart:math';
 
 class RegisterPage extends StatefulWidget {
   @override
@@ -16,10 +14,156 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _usernameController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
-  // Create typing speed calculators for password and confirm password
-  TypingSpeedCalculator passwordTypingSpeedCalculator = TypingSpeedCalculator();
-  TypingSpeedCalculator confirmPasswordTypingSpeedCalculator =
-      TypingSpeedCalculator();
+  // Define variables to store keystroke dynamics data
+  Map<String, List<int>> keystrokeData = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _addKeyEventListeners(_usernameController, 'username');
+    _addKeyEventListeners(_emailController, 'email');
+    _addKeyEventListeners(_passwordController, 'password');
+  }
+
+  // Add key event listeners to capture keystroke dynamics
+  void _addKeyEventListeners(
+      TextEditingController controller, String fieldName) {
+    controller.addListener(() {
+      if (controller.text.isNotEmpty) {
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final lastChar = controller.text.runes.last;
+        keystrokeData.putIfAbsent(fieldName, () => []);
+        keystrokeData[fieldName]!.add(now);
+      }
+    });
+  }
+
+  // Calculate dwell time (down-up digraph)
+  int _calculateDwellTime(String fieldName) {
+    final List<int> events = keystrokeData[fieldName]!;
+    if (events.length >= 2) {
+      return events.last - events.first;
+    }
+    return 0;
+  }
+
+  // Calculate digraphs
+  int _calculateDigraph(String fieldName, String digraphType) {
+    final List<int> events = keystrokeData[fieldName]!;
+    if (events.length >= 2) {
+      switch (digraphType) {
+        case 'up-down':
+          return events[1] - events[0];
+        case 'up-up':
+          return events[1] - events[0];
+        case 'down-down':
+          return events.last - events[events.length - 2];
+        case 'down-up':
+          return events.first - events[events.length - 2];
+      }
+    }
+    return 0;
+  }
+
+  double _calculateAverageConfirmPasswordKeystrokes(int index) {
+    final List<int> upDownDigraphs = [];
+    final List<int> upUpDigraphs = [];
+    final List<int> downDownDigraphs = [];
+    final List<int> downUpDigraphs = [];
+    int confirmPasswordCount = 0;
+
+    final List<int>? confirmDwellTimes = keystrokeData['confirmPassword$index'];
+    if (confirmDwellTimes != null && confirmDwellTimes.isNotEmpty) {
+      // Add debug print here
+      print('Confirm Password $index dwell times: $confirmDwellTimes');
+
+      for (int j = 0; j < confirmDwellTimes.length - 1; j++) {
+        final int digraph = confirmDwellTimes[j + 1] - confirmDwellTimes[j];
+        // Add debug print here
+        print('Digraph: $digraph');
+        print('Up-Down Digraphs: $upDownDigraphs');
+        print('Up-Up Digraphs: $upUpDigraphs');
+        print('Down-Down Digraphs: $downDownDigraphs');
+        print('Down-Up Digraphs: $downUpDigraphs');
+
+        if (digraph > 0) {
+          upDownDigraphs.add(digraph);
+        } else if (digraph < 0) {
+          downUpDigraphs.add(-digraph);
+        } else {
+          upUpDigraphs.add(0);
+        }
+      }
+      confirmPasswordCount += confirmDwellTimes.length - 1;
+    }
+
+    final int totalCount = upDownDigraphs.length +
+        upUpDigraphs.length +
+        downDownDigraphs.length +
+        downUpDigraphs.length;
+    final int totalSum =
+        upDownDigraphs.fold<int>(0, (prev, element) => prev + element) +
+            upUpDigraphs.fold<int>(0, (prev, element) => prev + element) +
+            downDownDigraphs.fold<int>(0, (prev, element) => prev + element) +
+            downUpDigraphs.fold<int>(0, (prev, element) => prev + element);
+
+    return totalCount > 0 ? totalSum / totalCount : 0;
+  }
+
+  double _calculateAveragePasswordKeystrokes() {
+    final List<int> dwellTimes = keystrokeData['password']!;
+    final List<int> upDownDigraphs = [];
+    final List<int> upUpDigraphs = [];
+    final List<int> downDownDigraphs = [];
+    final List<int> downUpDigraphs = [];
+
+    // Calculate dwell times and digraphs for the password field
+    for (int i = 0; i < dwellTimes.length - 1; i++) {
+      final int digraph = dwellTimes[i + 1] - dwellTimes[i];
+      if (digraph > 0) {
+        upDownDigraphs.add(digraph);
+      } else if (digraph < 0) {
+        downUpDigraphs.add(-digraph);
+      } else {
+        upUpDigraphs.add(0);
+      }
+    }
+
+    for (int i = 0; i < dwellTimes.length - 1; i++) {
+      final int digraph = dwellTimes[i + 1] - dwellTimes[i];
+      if (i > 0) {
+        final int prevDigraph = dwellTimes[i] - dwellTimes[i - 1];
+        if (prevDigraph > 0 && digraph > 0) {
+          downDownDigraphs.add(digraph - prevDigraph);
+        }
+      }
+    }
+
+    final int totalCount = upDownDigraphs.length +
+        upUpDigraphs.length +
+        downDownDigraphs.length +
+        downUpDigraphs.length;
+    final int totalSum =
+        upDownDigraphs.fold<int>(0, (prev, element) => prev + element) +
+            upUpDigraphs.fold<int>(0, (prev, element) => prev + element) +
+            downDownDigraphs.fold<int>(0, (prev, element) => prev + element) +
+            downUpDigraphs.fold<int>(0, (prev, element) => prev + element);
+
+    // Calculate the average keystrokes for confirm password fields
+    double totalConfirmPasswordKeystrokes = 0;
+    for (int i = 1; i <= 5; i++) {
+      // Assuming 5 confirm password fields
+      totalConfirmPasswordKeystrokes +=
+          _calculateAverageConfirmPasswordKeystrokes(i);
+    }
+    double averageConfirmPasswordKeystrokes = totalConfirmPasswordKeystrokes /
+        5; // Assuming 5 confirm password fields
+
+    // Calculate the overall average keystrokes
+    return totalCount > 0
+        ? (totalSum + averageConfirmPasswordKeystrokes) / totalCount
+        : 0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +172,7 @@ class _RegisterPageState extends State<RegisterPage> {
         children: [
           Container(
             decoration: BoxDecoration(
-              color: const Color(0xFF74BCFF), // #74BCFF background color
+              color: const Color(0xFF74BCFF),
             ),
           ),
           SingleChildScrollView(
@@ -38,7 +182,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 Container(
                   height: MediaQuery.of(context).size.height * 0.2,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFDFFE9), // #FDFFE9 half-circle color
+                    color: const Color(0xFFFDFFE9),
                     borderRadius: const BorderRadius.only(
                       bottomLeft: Radius.circular(200),
                       bottomRight: Radius.circular(200),
@@ -48,7 +192,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     child: Text(
                       'CREATE AN\nACCOUNT',
                       style: GoogleFonts.poppins(
-                        color: const Color(0xFF74BCFF), // #FDFFE9 text color
+                        color: const Color(0xFF74BCFF),
                         fontSize: 30,
                         letterSpacing: 4,
                       ),
@@ -69,19 +213,16 @@ class _RegisterPageState extends State<RegisterPage> {
                             decoration: InputDecoration(
                               labelText: 'Username',
                               labelStyle: GoogleFonts.poppins(
-                                color: const Color(
-                                    0xFFFDFFE9), // #FDFFE9 text color
+                                color: const Color(0xFFFDFFE9),
                               ),
                               enabledBorder: UnderlineInputBorder(
                                 borderSide: BorderSide(
-                                  color: const Color(
-                                      0xFFFDFFE9), // #FDFFE9 line color
+                                  color: const Color(0xFFFDFFE9),
                                 ),
                               ),
                               focusedBorder: UnderlineInputBorder(
                                 borderSide: BorderSide(
-                                  color: const Color(
-                                      0xFFFDFFE9), // #FDFFE9 line color
+                                  color: const Color(0xFFFDFFE9),
                                 ),
                               ),
                             ),
@@ -104,19 +245,16 @@ class _RegisterPageState extends State<RegisterPage> {
                             decoration: InputDecoration(
                               labelText: 'Email',
                               labelStyle: GoogleFonts.poppins(
-                                color: const Color(
-                                    0xFFFDFFE9), // #FDFFE9 text color
+                                color: const Color(0xFFFDFFE9),
                               ),
                               enabledBorder: UnderlineInputBorder(
                                 borderSide: BorderSide(
-                                  color: const Color(
-                                      0xFFFDFFE9), // #FDFFE9 line color
+                                  color: const Color(0xFFFDFFE9),
                                 ),
                               ),
                               focusedBorder: UnderlineInputBorder(
                                 borderSide: BorderSide(
-                                  color: const Color(
-                                      0xFFFDFFE9), // #FDFFE9 line color
+                                  color: const Color(0xFFFDFFE9),
                                 ),
                               ),
                             ),
@@ -139,26 +277,21 @@ class _RegisterPageState extends State<RegisterPage> {
                           child: TextFormField(
                             controller: _passwordController,
                             obscureText: true,
-                            onChanged: (_) {
-                              // Start tracking typing time for password field
-                              passwordTypingSpeedCalculator.startTyping();
-                            },
+                            onChanged: (_) {},
+                            onFieldSubmitted: (_) {},
                             decoration: InputDecoration(
                               labelText: 'Password',
                               labelStyle: GoogleFonts.poppins(
-                                color: const Color(
-                                    0xFFFDFFE9), // #FDFFE9 text color
+                                color: const Color(0xFFFDFFE9),
                               ),
                               enabledBorder: UnderlineInputBorder(
                                 borderSide: BorderSide(
-                                  color: const Color(
-                                      0xFFFDFFE9), // #FDFFE9 line color
+                                  color: const Color(0xFFFDFFE9),
                                 ),
                               ),
                               focusedBorder: UnderlineInputBorder(
                                 borderSide: BorderSide(
-                                  color: const Color(
-                                      0xFFFDFFE9), // #FDFFE9 line color
+                                  color: const Color(0xFFFDFFE9),
                                 ),
                               ),
                             ),
@@ -179,27 +312,21 @@ class _RegisterPageState extends State<RegisterPage> {
                             height: 60,
                             child: TextFormField(
                               obscureText: true,
-                              onChanged: (_) {
-                                // Start tracking typing time for confirm password field
-                                confirmPasswordTypingSpeedCalculator
-                                    .startTyping();
-                              },
+                              onChanged: (_) {},
+                              onFieldSubmitted: (_) {},
                               decoration: InputDecoration(
                                 labelText: 'Confirm Password $i',
                                 labelStyle: GoogleFonts.poppins(
-                                  color: const Color(
-                                      0xFFFDFFE9), // #FDFFE9 text color
+                                  color: const Color(0xFFFDFFE9),
                                 ),
                                 enabledBorder: UnderlineInputBorder(
                                   borderSide: BorderSide(
-                                    color: const Color(
-                                        0xFFFDFFE9), // #FDFFE9 line color
+                                    color: const Color(0xFFFDFFE9),
                                   ),
                                 ),
                                 focusedBorder: UnderlineInputBorder(
                                   borderSide: BorderSide(
-                                    color: const Color(
-                                        0xFFFDFFE9), // #FDFFE9 line color
+                                    color: const Color(0xFFFDFFE9),
                                   ),
                                 ),
                               ),
@@ -209,9 +336,6 @@ class _RegisterPageState extends State<RegisterPage> {
                                 }
                                 if (value.length < 8) {
                                   return 'Password must be at least 8 characters';
-                                }
-                                if (value != _passwordController.text) {
-                                  return 'Passwords do not match';
                                 }
                                 return null;
                               },
@@ -224,10 +348,9 @@ class _RegisterPageState extends State<RegisterPage> {
                             Text(
                               'Register',
                               style: GoogleFonts.poppins(
-                                color: const Color(
-                                    0xFFFDFFE9), // #FDFFE9 text color
+                                color: const Color(0xFFFDFFE9),
                                 fontSize: 16,
-                                letterSpacing: 2, // Reduced font size
+                                letterSpacing: 2,
                               ),
                             ),
                             SizedBox(width: 10),
@@ -235,7 +358,6 @@ class _RegisterPageState extends State<RegisterPage> {
                               onPressed: () async {
                                 if (_formKey.currentState!.validate()) {
                                   try {
-                                    // Register the user with Firebase Authentication
                                     UserCredential userCredential =
                                         await FirebaseAuth.instance
                                             .createUserWithEmailAndPassword(
@@ -243,17 +365,35 @@ class _RegisterPageState extends State<RegisterPage> {
                                       password: _passwordController.text,
                                     );
 
-                                    // Store user information in Firestore
-                                    await FirebaseFirestore.instance
-                                        .collection('users')
-                                        .doc(userCredential.user!.uid)
-                                        .set({
+                                    // Calculate keystroke metrics
+                                    double averagePasswordKeystrokes =
+                                        _calculateAveragePasswordKeystrokes();
+                                    Map<String, double>
+                                        confirmPasswordAverages = {};
+                                    for (int i = 1; i <= 5; i++) {
+                                      double averageConfirmPasswordKeystrokes =
+                                          _calculateAverageConfirmPasswordKeystrokes(
+                                              i);
+                                      confirmPasswordAverages[
+                                              'confirmPassword$i'] =
+                                          averageConfirmPasswordKeystrokes;
+                                    }
+
+                                    Map<String, dynamic> userData = {
                                       'email': _emailController.text,
                                       'username': _usernameController.text,
                                       'password': _passwordController.text,
-                                    });
+                                      'averageKeystrokes':
+                                          averagePasswordKeystrokes,
+                                      'averageConfirmPasswordKeystrokes':
+                                          confirmPasswordAverages,
+                                    };
 
-                                    // Show registration success message
+                                    await FirebaseFirestore.instance
+                                        .collection('users')
+                                        .doc(userCredential.user!.uid)
+                                        .set(userData);
+
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
@@ -268,10 +408,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                       ),
                                     );
 
-                                    // Navigate to login screen
                                     Navigator.pushNamed(context, '/');
                                   } catch (e) {
-                                    // Show error message if registration fails
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text('$e'),
@@ -284,10 +422,8 @@ class _RegisterPageState extends State<RegisterPage> {
                               },
                               style: ElevatedButton.styleFrom(
                                 shape: const CircleBorder(),
-                                backgroundColor:
-                                    const Color(0xFFFDFFE9), // Background color
-                                foregroundColor: const Color(
-                                    0xFF74BCFF), // Text (icon) color
+                                backgroundColor: const Color(0xFFFDFFE9),
+                                foregroundColor: const Color(0xFF74BCFF),
                               ),
                               child: Icon(Icons.arrow_forward),
                             ),
@@ -303,8 +439,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               Text("Already have an account? ",
                                   style: GoogleFonts.poppins(
                                       color: const Color(0xFFFDFFE9))),
-                              SizedBox(
-                                  height: 5), // Adjust the height as needed
+                              SizedBox(height: 5),
                               GestureDetector(
                                 onTap: () {
                                   Navigator.pop(context);
@@ -329,49 +464,5 @@ class _RegisterPageState extends State<RegisterPage> {
         ],
       ),
     );
-  }
-}
-
-// Typing speed calculator class
-class TypingSpeedCalculator {
-  List<DateTime> keystrokes = [];
-  DateTime? startTime;
-
-  void startTyping() {
-    startTime = DateTime.now();
-  }
-
-  void recordKeystroke() {
-    keystrokes.add(DateTime.now());
-  }
-
-  void stopTyping() {
-    // Optionally, you can stop tracking keystrokes or handle any cleanup here.
-  }
-
-  double calculateTypingSpeed() {
-    if (keystrokes.isEmpty || startTime == null) {
-      return 0.0;
-    }
-    Duration totalDuration = keystrokes.last.difference(startTime!);
-    int numberOfKeystrokes = keystrokes.length;
-    double charactersPerMillisecond =
-        numberOfKeystrokes / totalDuration.inMilliseconds;
-    double charactersPerMinute =
-        charactersPerMillisecond * 60000; // Convert to characters per minute
-    return charactersPerMinute;
-  }
-
-  Future<void> storeTypingSpeedInFirestore(String users) async {
-    double typingSpeed = calculateTypingSpeed();
-    try {
-      await FirebaseFirestore.instance.collection(users).add({
-        'typing_speed': typingSpeed,
-        'timestamp': DateTime.now(),
-      });
-      print('Typing speed data stored in Firestore for $users.');
-    } catch (error) {
-      print('Error storing typing speed data for $users: $error');
-    }
   }
 }
