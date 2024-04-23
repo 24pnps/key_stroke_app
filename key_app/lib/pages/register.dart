@@ -9,6 +9,7 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  // initializes several components used for creating a register
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
@@ -39,31 +40,31 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   // Calculate dwell time (down-up digraph)
-  int _calculateDwellTime(String fieldName) {
-    final List<int> events = keystrokeData[fieldName]!;
-    if (events.length >= 2) {
-      return events.last - events.first;
-    }
-    return 0;
-  }
+  // int _calculateDwellTime(String fieldName) {
+  //   final List<int> events = keystrokeData[fieldName]!;
+  //   if (events.length >= 2) {
+  //     return events.last - events.first;
+  //   }
+  //   return 0;
+  // }
 
   // Calculate digraphs
-  int _calculateDigraph(String fieldName, String digraphType) {
-    final List<int> events = keystrokeData[fieldName]!;
-    if (events.length >= 2) {
-      switch (digraphType) {
-        case 'up-down':
-          return events[1] - events[0];
-        case 'up-up':
-          return events[1] - events[0];
-        case 'down-down':
-          return events.last - events[events.length - 2];
-        case 'down-up':
-          return events.first - events[events.length - 2];
-      }
-    }
-    return 0;
-  }
+  // int _calculateDigraph(String fieldName, String digraphType) {
+  //   final List<int> events = keystrokeData[fieldName]!;
+  //   if (events.length >= 2) {
+  //     switch (digraphType) {
+  //       case 'up-down':
+  //         return events[1] - events[0];
+  //       case 'up-up':
+  //         return events[1] - events[0];
+  //       case 'down-down':
+  //         return events.last - events[events.length - 2];
+  //       case 'down-up':
+  //         return events.first - events[events.length - 2];
+  //     }
+  //   }
+  //   return 0;
+  // }
 
   double _calculateAverageConfirmPasswordKeystrokes(int index) {
     final List<int> upDownDigraphs = [];
@@ -74,17 +75,8 @@ class _RegisterPageState extends State<RegisterPage> {
 
     final List<int>? confirmDwellTimes = keystrokeData['confirmPassword$index'];
     if (confirmDwellTimes != null && confirmDwellTimes.isNotEmpty) {
-      // Add debug print here
-      print('Confirm Password $index dwell times: $confirmDwellTimes');
-
       for (int j = 0; j < confirmDwellTimes.length - 1; j++) {
         final int digraph = confirmDwellTimes[j + 1] - confirmDwellTimes[j];
-        // Add debug print here
-        print('Digraph: $digraph');
-        print('Up-Down Digraphs: $upDownDigraphs');
-        print('Up-Up Digraphs: $upUpDigraphs');
-        print('Down-Down Digraphs: $downDownDigraphs');
-        print('Down-Up Digraphs: $downUpDigraphs');
 
         if (digraph > 0) {
           upDownDigraphs.add(digraph);
@@ -118,6 +110,8 @@ class _RegisterPageState extends State<RegisterPage> {
     final List<int> downUpDigraphs = [];
 
     // Calculate dwell times and digraphs for the password field
+    // Dwell Time = (1 / (N - 1)) * Σ(Ti)
+
     for (int i = 0; i < dwellTimes.length - 1; i++) {
       final int digraph = dwellTimes[i + 1] - dwellTimes[i];
       if (digraph > 0) {
@@ -368,16 +362,16 @@ class _RegisterPageState extends State<RegisterPage> {
                                     // Calculate keystroke metrics
                                     double averagePasswordKeystrokes =
                                         _calculateAveragePasswordKeystrokes();
-                                    Map<String, double>
-                                        confirmPasswordAverages = {};
-                                    for (int i = 1; i <= 5; i++) {
-                                      double averageConfirmPasswordKeystrokes =
-                                          _calculateAverageConfirmPasswordKeystrokes(
-                                              i);
-                                      confirmPasswordAverages[
-                                              'confirmPassword$i'] =
-                                          averageConfirmPasswordKeystrokes;
-                                    }
+                                    // Map<String, double>
+                                    //     confirmPasswordAverages = {};
+                                    // for (int i = 1; i <= 5; i++) {
+                                    //   double averageConfirmPasswordKeystrokes =
+                                    //       _calculateAverageConfirmPasswordKeystrokes(
+                                    //           i);
+                                    //   confirmPasswordAverages[
+                                    //           'confirmPassword$i'] =
+                                    //       averageConfirmPasswordKeystrokes;
+                                    // }
 
                                     Map<String, dynamic> userData = {
                                       'email': _emailController.text,
@@ -385,8 +379,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                       'password': _passwordController.text,
                                       'averageKeystrokes':
                                           averagePasswordKeystrokes,
-                                      'averageConfirmPasswordKeystrokes':
-                                          confirmPasswordAverages,
+                                      // 'averageConfirmPasswordKeystrokes':
+                                      //     confirmPasswordAverages,
                                     };
 
                                     await FirebaseFirestore.instance
