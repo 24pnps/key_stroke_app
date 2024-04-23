@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'home.dart';
 
 class LoginPage extends StatefulWidget {
@@ -9,13 +10,12 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  // initializes several components used for creating a login
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-      TextEditingController();
 
-  // Function to handle user login
   Future<void> _login() async {
+    // trim is for delete the white space before and after
     final String email = _emailController.text.trim();
     final String password = _passwordController.text.trim();
 
@@ -38,17 +38,49 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     try {
+      // Calculate average password keystrokes
+      double averagePasswordKeystrokes =
+          _calculateAveragePasswordKeystrokes(password);
+
       // Sign in with email and password
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final UserCredential userCredential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      // Retrieve user data from Firestore
+      final userDataSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .get();
+
+      // Extract average keystrokes from user data
+      final double averageKeystrokes = userDataSnapshot['averageKeystrokes'];
+
+      // Compare averageKeystrokes with the calculated averagePasswordKeystrokes
+      if (averageKeystrokes != averagePasswordKeystrokes) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Login Error'),
+            content: Text('Keystrokes did not match.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
 
       // Navigate to the home page upon successful login
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => Home(email: email, username: '',),
+          builder: (context) => Home(email: email, username: ''),
         ),
       );
     } catch (e) {
@@ -67,6 +99,16 @@ class _LoginPageState extends State<LoginPage> {
         ),
       );
     }
+  }
+
+// Function to calculate average password keystrokes
+  double _calculateAveragePasswordKeystrokes(String password) {
+    int totalKeystrokes = 0;
+    for (int i = 0; i < password.length - 1; i++) {
+      int keystroke = password.codeUnitAt(i + 1) - password.codeUnitAt(i);
+      totalKeystrokes += keystroke;
+    }
+    return totalKeystrokes / (password.length - 1);
   }
 
   @override
@@ -145,30 +187,6 @@ class _LoginPageState extends State<LoginPage> {
                           .copyWith(color: Color(0xFFFDFFE9)),
                       decoration: InputDecoration(
                         labelText: 'Password',
-                        labelStyle: GoogleFonts.poppins()
-                            .copyWith(color: Color(0xFFFDFFE9)),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFFFDFFE9)),
-                        ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a password';
-                        }
-                        if (value.length < 8) {
-                          return 'Password must be at least 8 characters';
-                        }
-                        return null;
-                      },
-                    ),
-                    SizedBox(height: 16.0),
-                    TextFormField(
-                      controller: _confirmPasswordController,
-                      obscureText: true,
-                      style: GoogleFonts.poppins()
-                          .copyWith(color: Color(0xFFFDFFE9)),
-                      decoration: InputDecoration(
-                        labelText: 'Confirm Password',
                         labelStyle: GoogleFonts.poppins()
                             .copyWith(color: Color(0xFFFDFFE9)),
                         enabledBorder: UnderlineInputBorder(
